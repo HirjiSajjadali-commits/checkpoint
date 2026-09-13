@@ -9,6 +9,7 @@ export default function GameStatus() {
   const opponent = useGameStore((s) => s.opponent);
   const cpuColor = useGameStore((s) => s.cpuColor);
   const engineStatus = useGameStore((s) => s.engineStatus);
+  const online = useGameStore((s) => s.online);
 
   const isCpuTurn = opponent === 'cpu' && turn === cpuColor;
 
@@ -17,8 +18,18 @@ export default function GameStatus() {
     statusText = `Checkmate — ${result.winner === 'w' ? 'White' : 'Black'} wins`;
   } else if (result.reason === 'stalemate') {
     statusText = 'Stalemate — draw';
-  } else if (result.reason === 'draw') {
+  } else if (result.reason === 'draw' || result.reason === 'draw-agreed') {
     statusText = 'Draw';
+  } else if (result.reason === 'resignation') {
+    statusText = `${result.winner === 'w' ? 'White' : 'Black'} wins by resignation`;
+  } else if (result.reason === 'timeout') {
+    statusText = `${result.winner === 'w' ? 'White' : 'Black'} wins on time`;
+  } else if (online && online.status === 'connecting') {
+    statusText = 'Connecting…';
+  } else if (online && online.status === 'waiting') {
+    statusText = 'Waiting for your friend to join…';
+  } else if (online && online.status === 'disconnected') {
+    statusText = 'Reconnecting…';
   } else if (isCpuTurn && engineStatus === 'thinking') {
     statusText = 'Computer is thinking…';
   } else {
@@ -32,9 +43,11 @@ export default function GameStatus() {
         <button className="btn" onClick={flipBoard}>
           Flip board
         </button>
-        <button className="btn btn-accent" onClick={reset}>
-          New game
-        </button>
+        {!online && (
+          <button className="btn btn-accent" onClick={reset}>
+            New game
+          </button>
+        )}
       </div>
       <div aria-live="polite" className="sr-only">
         {announcement}

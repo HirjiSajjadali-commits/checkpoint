@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore';
 export default function GameControls() {
   const opponent = useGameStore((s) => s.opponent);
   const cpuColor = useGameStore((s) => s.cpuColor);
+  const online = useGameStore((s) => s.online);
   const over = useGameStore((s) => s.result.over);
   const drawOffer = useGameStore((s) => s.drawOffer);
   const resign = useGameStore((s) => s.resign);
@@ -12,14 +13,16 @@ export default function GameControls() {
   const declineDraw = useGameStore((s) => s.declineDraw);
 
   if (over) return null;
+  if (online && online.status !== 'connected') return null;
 
-  const humanColor: Color = cpuColor === 'w' ? 'b' : 'w';
+  const myColor: Color | null = online ? online.myColor : opponent === 'cpu' ? (cpuColor === 'w' ? 'b' : 'w') : null;
+  const opponentLabel = online ? 'your friend' : 'the computer';
 
   if (drawOffer) {
-    if (opponent === 'cpu' && drawOffer === humanColor) {
+    if (myColor !== null && drawOffer === myColor) {
       return (
         <div className="game-controls">
-          <p className="draw-pending">Draw offer sent — waiting for the computer…</p>
+          <p className="draw-pending">Draw offer sent — waiting for {opponentLabel}…</p>
         </div>
       );
     }
@@ -37,13 +40,13 @@ export default function GameControls() {
     );
   }
 
-  if (opponent === 'cpu') {
+  if (myColor !== null) {
     return (
       <div className="game-controls">
-        <button className="btn" onClick={() => offerDraw(humanColor)}>
+        <button className="btn" onClick={() => offerDraw(myColor)}>
           Offer draw
         </button>
-        <button className="btn btn-danger" onClick={() => resign(humanColor)}>
+        <button className="btn btn-danger" onClick={() => resign(myColor)}>
           Resign
         </button>
       </div>

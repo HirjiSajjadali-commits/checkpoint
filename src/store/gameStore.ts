@@ -27,6 +27,19 @@ export type PendingPromotion = { from: Square; to: Square; color: Color };
 export type CpuLevelId = 'beginner' | 'club' | 'strong' | 'expert' | 'full';
 export type EngineStatus = 'idle' | 'loading' | 'ready' | 'thinking';
 
+export type OnlineStatus = 'connecting' | 'waiting' | 'connected' | 'disconnected' | 'error';
+export type OnlineSession = { roomCode: string; myColor: Color; status: OnlineStatus } | null;
+
+export type RemoteSnapshot = {
+  fen: string;
+  lastMove: { from: Square; to: Square } | null;
+  moveHistory: string[];
+  clockMs: { w: number; b: number } | null;
+  result: GameResult;
+  drawOffer: Color | null;
+  timeControl: TimeControlId;
+};
+
 interface GameState {
   chess: Chess;
   fen: string;
@@ -52,6 +65,9 @@ interface GameState {
   clockMs: { w: number; b: number } | null;
   drawOffer: Color | null;
 
+  online: OnlineSession;
+  uiTab: 'local' | 'cpu' | 'online';
+
   selectSquare: (square: Square) => void;
   clearSelection: () => void;
   tryMove: (from: Square, to: Square) => void;
@@ -71,6 +87,11 @@ interface GameState {
   acceptDraw: () => void;
   declineDraw: () => void;
   resign: (by: Color) => void;
+  startOnlineSession: (roomCode: string, myColor: Color) => void;
+  setOnlineStatus: (status: OnlineStatus) => void;
+  leaveOnlineSession: () => void;
+  applyRemoteState: (snapshot: RemoteSnapshot) => void;
+  setUiTab: (tab: 'local' | 'cpu' | 'online') => void;
 }
 
 function findKingSquare(chess: Chess, color: Color): Square | null {
@@ -82,7 +103,7 @@ function findKingSquare(chess: Chess, color: Color): Square | null {
   return null;
 }
 
-function deriveStateFromChess(chess: Chess, lastMove: { from: Square; to: Square } | null) {
+function deriveBoardState(chess: Chess, lastMove: { from: Square; to: Square } | null) {
   const turn = chess.turn();
   const inCheck = chess.inCheck();
   let reason: GameResultReason = null;
@@ -102,7 +123,6 @@ function deriveStateFromChess(chess: Chess, lastMove: { from: Square; to: Square
     lastMove,
     checkSquare: inCheck ? findKingSquare(chess, turn) : null,
     result: { over: reason !== null, reason, winner },
-    moveHistory: chess.history(),
   };
 }
 
@@ -128,13 +148,20 @@ function playSoundForMove(capture: boolean, result: GameResult, inCheck: boolean
   else playMoveSound();
 }
 
-function executeMove(chess: Chess, from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n') {
+function executeMove(
+  chess: Chess,
+  from: Square,
+  to: Square,
+  previousHistory: string[],
+  promotion?: 'q' | 'r' | 'b' | 'n',
+) {
   const moverColor = chess.turn();
   const move = chess.move({ from, to, promotion });
-  const derived = deriveStateFromChess(chess, { from, to });
+  const derived = deriveBoardState(chess, { from, to });
+  const moveHistory = [...previousHistory, move.san];
   const announcement = describeMove(chess, move.san, moverColor, derived.result);
   playSoundForMove(move.captured !== undefined, derived.result, chess.inCheck());
-  return { derived, announcement };
+  return { derived, moveHistory, announcement };
 }
 
 function initialClock(timeControl: TimeControlId): GameState['clockMs'] {
@@ -167,6 +194,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   clockMs: null,
   drawOffer: null,
 
+  online: null,
+  uiTab: 'local',
+
   selectSquare: (square) => {
     const { chess, result } = get();
     if (result.over) return;
@@ -182,7 +212,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   clearSelection: () => set({ selectedSquare: null, legalTargets: [] }),
 
   tryMove: (from, to) => {
-    const { chess, result } = get();
+    const { chess, result, moveHistory } = get();
     if (result.over) return;
     const moves = chess.moves({ square: from, verbose: true });
     const candidate = moves.find((m) => m.to === to);
@@ -198,7 +228,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       return;
     }
-    const { derived, announcement } = executeMove(chess, from, to);
+    const { derived, moveHistory: newHistory, announcement } = executeMove(
+      chess,
+      from,
+      to,
+      moveHistory,
+    );
     set({
       ...derived,
       selectedSquare: null,
@@ -206,16 +241,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingPromotion: null,
       announcement,
       drawOffer: null,
+      moveHistory: newHistory,
     });
   },
 
   resolvePromotion: (piece) => {
-    const { chess, pendingPromotion } = get();
+    const { chess, pendingPromotion, moveHistory } = get();
     if (!pendingPromotion) return;
-    const { derived, announcement } = executeMove(
+    const { derived, moveHistory: newHistory, announcement } = executeMove(
       chess,
       pendingPromotion.from,
       pendingPromotion.to,
+      moveHistory,
       piece,
     );
     set({
@@ -225,6 +262,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingPromotion: null,
       announcement,
       drawOffer: null,
+      moveHistory: newHistory,
     });
   },
 
@@ -260,9 +298,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   setEngineStatus: (status) => set({ engineStatus: status }),
 
   playEngineMove: (from, to, promotion) => {
-    const { chess, result } = get();
+    const { chess, result, moveHistory } = get();
     if (result.over) return;
-    const { derived, announcement } = executeMove(chess, from, to, promotion);
+    const { derived, moveHistory: newHistory, announcement } = executeMove(
+      chess,
+      from,
+      to,
+      moveHistory,
+      promotion,
+    );
     set({
       ...derived,
       selectedSquare: null,
@@ -270,6 +314,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingPromotion: null,
       announcement,
       drawOffer: null,
+      moveHistory: newHistory,
     });
   },
 
@@ -321,6 +366,92 @@ export const useGameStore = create<GameState>((set, get) => ({
       announcement: `${colorName} resigns. ${winnerName} wins.`,
     });
   },
+
+  startOnlineSession: (roomCode, myColor) => {
+    const chess = new Chess();
+    set({
+      chess,
+      fen: chess.fen(),
+      board: chess.board(),
+      turn: 'w',
+      selectedSquare: null,
+      legalTargets: [],
+      lastMove: null,
+      checkSquare: null,
+      pendingPromotion: null,
+      result: { over: false, reason: null, winner: null },
+      announcement: 'Waiting for opponent…',
+      moveHistory: [],
+      opponent: 'human',
+      orientation: myColor,
+      online: { roomCode, myColor, status: 'connecting' },
+      uiTab: 'online',
+    });
+  },
+
+  setOnlineStatus: (status) =>
+    set((s) => (s.online ? { online: { ...s.online, status } } : {})),
+
+  leaveOnlineSession: () => {
+    set({ online: null });
+    get().reset();
+  },
+
+  applyRemoteState: (snapshot) => {
+    const { chess, moveHistory: prevHistory, result: prevResult } = get();
+    try {
+      chess.load(snapshot.fen);
+    } catch {
+      return;
+    }
+    const derived = deriveBoardState(chess, snapshot.lastMove);
+    const newlyOver = snapshot.result.over && !prevResult.over;
+    let announcement = '';
+
+    if (snapshot.moveHistory.length > prevHistory.length) {
+      const san = snapshot.moveHistory[snapshot.moveHistory.length - 1];
+      const moverName = derived.turn === 'w' ? 'Black' : 'White';
+      announcement = `${moverName} plays ${san}.`;
+      if (snapshot.result.reason === 'checkmate') {
+        announcement += ` Checkmate. ${moverName} wins.`;
+      } else if (snapshot.result.reason === 'stalemate') {
+        announcement += ' Stalemate. Game drawn.';
+      } else if (snapshot.result.reason === 'draw') {
+        announcement += ' Draw.';
+      } else if (derived.checkSquare) {
+        announcement += ' Check.';
+      }
+      if (newlyOver) playGameEndSound();
+      else if (derived.checkSquare) playCheckSound();
+      else playMoveSound();
+    } else if (newlyOver) {
+      const winnerName = snapshot.result.winner === 'w' ? 'White' : 'Black';
+      const loserName = snapshot.result.winner === 'w' ? 'Black' : 'White';
+      if (snapshot.result.reason === 'resignation') {
+        announcement = `${loserName} resigns. ${winnerName} wins.`;
+      } else if (snapshot.result.reason === 'draw-agreed') {
+        announcement = 'Draw agreed.';
+      } else if (snapshot.result.reason === 'timeout') {
+        announcement = `${loserName} ran out of time. ${winnerName} wins.`;
+      }
+      playGameEndSound();
+    }
+
+    set({
+      ...derived,
+      selectedSquare: null,
+      legalTargets: [],
+      pendingPromotion: null,
+      moveHistory: snapshot.moveHistory,
+      clockMs: snapshot.clockMs,
+      drawOffer: snapshot.drawOffer,
+      timeControl: snapshot.timeControl,
+      result: snapshot.result,
+      announcement: announcement || get().announcement,
+    });
+  },
+
+  setUiTab: (tab) => set({ uiTab: tab }),
 }));
 
 export { pieceName };

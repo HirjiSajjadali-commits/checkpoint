@@ -560,6 +560,76 @@ body {
   justify-content: center;
 }
 
+.online-panel {
+  width: min(92vw, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.online-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.online-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.online-status {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--board-border);
+  color: var(--color-text-muted);
+}
+
+.online-status-connected {
+  background: color-mix(in srgb, #2fa84f 18%, var(--color-surface));
+  border-color: #2fa84f;
+  color: #1f7a38;
+}
+
+.online-status-waiting,
+.online-status-connecting {
+  background: color-mix(in srgb, var(--accent) 15%, var(--color-surface));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.online-status-disconnected,
+.online-status-error {
+  background: color-mix(in srgb, var(--accent-check) 15%, var(--color-surface));
+  border-color: var(--accent-check);
+  color: var(--accent-check);
+}
+
+.online-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.online-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--board-border);
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
