@@ -1,0 +1,24 @@
+Checkpoint — Third-Party Assets & Credits
+==========================================
+
+Chess piece set: "cburnett"
+Author: Colin M.L. Burnett
+License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/)
+Source: https://github.com/lichess-org/lila/tree/master/public/piece/cburnett
+Original artwork also available at: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces
+
+Files used (src/assets/pieces/): wK.svg, wQ.svg, wR.svg, wB.svg, wN.svg, wP.svg,
+bK.svg, bQ.svg, bR.svg, bB.svg, bN.svg, bP.svg — unmodified.
+
+Chess rules/legality engine: chess.js
+License: BSD-2-Clause
+Source: https://github.com/jhlywa/chess.js
+
+CPU opponent: Stockfish (WASM build)
+License: GPL-3.0
+Source: https://github.com/nmrugg/stockfish.js / https://stockfishchess.org
+
+Sound effects: synthesized in-browser via the Web Audio API — no third-party
+audio clips used, no attribution required.
+
+Everything else (code, board design, layout) is original work for this project.
