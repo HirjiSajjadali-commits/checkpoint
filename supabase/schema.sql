@@ -1,5 +1,6 @@
 -- Checkpoint — online multiplayer room state.
 -- Run this once in your Supabase project's SQL editor (Dashboard → SQL Editor → New query).
+-- Safe to re-run: every statement either uses IF NOT EXISTS or drops first.
 --
 -- There is no auth/accounts in this app: a "room" is just a short random code
 -- in the URL, and anyone who knows the code can read and write that one row.
@@ -14,6 +15,16 @@ create table if not exists public.rooms (
 );
 
 alter table public.rooms enable row level security;
+
+-- RLS policies only take effect once the underlying SQL role has table
+-- privileges at all — grant those explicitly rather than relying on a
+-- project's default-privilege setup.
+grant usage on schema public to anon, authenticated;
+grant select, insert, update on public.rooms to anon, authenticated;
+
+drop policy if exists "rooms are readable by anyone" on public.rooms;
+drop policy if exists "rooms are insertable by anyone" on public.rooms;
+drop policy if exists "rooms are updatable by anyone" on public.rooms;
 
 -- Anyone with the anon key can read or write any room row. Combined with a
 -- random, hard-to-guess room code, this is enough for casual friend-to-friend

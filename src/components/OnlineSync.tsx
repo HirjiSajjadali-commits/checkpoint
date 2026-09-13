@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useGameStore, type RemoteSnapshot } from '../store/gameStore';
 import { supabase } from '../online/supabaseClient';
 import { fetchRoom, pushRoomState } from '../online/roomApi';
+import { loadRoomColor, roomCodeFromUrl } from '../online/roomStorage';
 
 const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000];
 
@@ -17,17 +18,40 @@ export default function OnlineSync() {
   const timeControl = useGameStore((s) => s.timeControl);
   const setOnlineStatus = useGameStore((s) => s.setOnlineStatus);
   const applyRemoteState = useGameStore((s) => s.applyRemoteState);
+  const startOnlineSession = useGameStore((s) => s.startOnlineSession);
+  const setUiTab = useGameStore((s) => s.setUiTab);
+  const setPendingJoinCode = useGameStore((s) => s.setPendingJoinCode);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastSyncedRef = useRef<string>('');
   const retryRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against pushing our just-reset local state before the initial
+  // fetch has had a chance to restore the room's real, in-progress position.
+  const readyToPushRef = useRef(false);
+
+  // On first load, a room code in the URL means someone opened a shared
+  // link (or is reloading mid-game). Auto-rejoin if we know our color
+  // already, otherwise surface a join prompt.
+  useEffect(() => {
+    const code = roomCodeFromUrl();
+    if (!code) return;
+    const savedColor = loadRoomColor(code);
+    if (savedColor) {
+      startOnlineSession(code, savedColor);
+    } else {
+      setPendingJoinCode(code);
+      setUiTab('online');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Connect to the room's realtime channel whenever we join/leave a room.
   useEffect(() => {
     if (!online || !supabase) return;
     const { roomCode } = online;
     let cancelled = false;
+    readyToPushRef.current = false;
 
     function connect() {
       if (cancelled || !supabase) return;
@@ -51,10 +75,12 @@ export default function OnlineSync() {
           retryRef.current = 0;
           await channel.track({ joined_at: Date.now() });
           const remote = await fetchRoom(roomCode);
-          if (remote && !cancelled) {
+          if (cancelled) return;
+          if (remote) {
             lastSyncedRef.current = JSON.stringify(remote);
             applyRemoteState(remote);
           }
+          readyToPushRef.current = true;
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           setOnlineStatus('disconnected');
           if (cancelled) return;
@@ -83,7 +109,7 @@ export default function OnlineSync() {
 
   // Push local state changes out to Postgres + the live channel.
   useEffect(() => {
-    if (!online) return;
+    if (!online || !readyToPushRef.current) return;
     const snapshot: RemoteSnapshot = {
       fen,
       lastMove,

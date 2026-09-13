@@ -1,15 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Chess } from 'chess.js';
 import { useGameStore, type RemoteSnapshot } from '../store/gameStore';
 import { isSupabaseConfigured, generateRoomCode } from '../online/supabaseClient';
 import { createRoom } from '../online/roomApi';
-import {
-  saveRoomColor,
-  loadRoomColor,
-  roomUrlFor,
-  roomCodeFromUrl,
-  clearRoomFromUrl,
-} from '../online/roomStorage';
+import { saveRoomColor, roomUrlFor, clearRoomFromUrl } from '../online/roomStorage';
 import { timeControlConfig } from '../game/timeControls';
 
 const STATUS_TEXT: Record<string, string> = {
@@ -23,24 +17,12 @@ const STATUS_TEXT: Record<string, string> = {
 export default function OnlinePanel() {
   const online = useGameStore((s) => s.online);
   const timeControl = useGameStore((s) => s.timeControl);
+  const pendingJoinCode = useGameStore((s) => s.pendingJoinCode);
   const startOnlineSession = useGameStore((s) => s.startOnlineSession);
   const leaveOnlineSession = useGameStore((s) => s.leaveOnlineSession);
+  const setPendingJoinCode = useGameStore((s) => s.setPendingJoinCode);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (online) return;
-    const code = roomCodeFromUrl();
-    if (!code) return;
-    const savedColor = loadRoomColor(code);
-    if (savedColor) {
-      startOnlineSession(code, savedColor);
-    } else {
-      setPendingJoinCode(code);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   if (!isSupabaseConfigured) {
     return (

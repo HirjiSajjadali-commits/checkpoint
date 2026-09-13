@@ -67,6 +67,7 @@ interface GameState {
 
   online: OnlineSession;
   uiTab: 'local' | 'cpu' | 'online';
+  pendingJoinCode: string | null;
 
   selectSquare: (square: Square) => void;
   clearSelection: () => void;
@@ -92,6 +93,7 @@ interface GameState {
   leaveOnlineSession: () => void;
   applyRemoteState: (snapshot: RemoteSnapshot) => void;
   setUiTab: (tab: 'local' | 'cpu' | 'online') => void;
+  setPendingJoinCode: (code: string | null) => void;
 }
 
 function findKingSquare(chess: Chess, color: Color): Square | null {
@@ -196,6 +198,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   online: null,
   uiTab: 'local',
+  pendingJoinCode: null,
 
   selectSquare: (square) => {
     const { chess, result } = get();
@@ -452,6 +455,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   setUiTab: (tab) => set({ uiTab: tab }),
+  setPendingJoinCode: (code) => set({ pendingJoinCode: code }),
 }));
 
 export { pieceName };
