@@ -100,6 +100,10 @@ body {
   display: contents;
 }
 
+.board--locked {
+  pointer-events: none;
+}
+
 .square {
   position: relative;
   display: flex;
@@ -281,6 +285,105 @@ body {
 .promotion-choice img {
   width: 80%;
   height: 80%;
+}
+
+.opponent-panel {
+  width: min(92vw, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--board-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented-btn {
+  flex: 1;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border: none;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-right: 1px solid var(--board-border);
+}
+
+.segmented-btn:last-child {
+  border-right: none;
+}
+
+.segmented-btn[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.segmented-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.cpu-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cpu-levels {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.level-btn {
+  flex: 1 1 auto;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--board-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+}
+
+.level-btn .rating {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.level-btn[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.level-btn[aria-pressed='true'] .rating {
+  color: var(--accent-text);
+  opacity: 0.85;
+}
+
+.level-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.engine-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .sr-only {

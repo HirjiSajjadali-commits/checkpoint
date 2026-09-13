@@ -13,6 +13,7 @@
     "chess.js": "^1.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "stockfish": "^18.0.8",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

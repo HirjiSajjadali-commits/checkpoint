@@ -14,9 +14,13 @@ Chess rules/legality engine: chess.js
 License: BSD-2-Clause
 Source: https://github.com/jhlywa/chess.js
 
-CPU opponent: Stockfish (WASM build)
-License: GPL-3.0
+CPU opponent: Stockfish 18 (WASM build, "lite single-threaded" flavor)
+Author: The Stockfish developers; WASM build by Nathan Rugg / Chess.com, LLC
+License: GPL-3.0 (see public/engine/LICENSE-stockfish.txt)
 Source: https://github.com/nmrugg/stockfish.js / https://stockfishchess.org
+Files used (public/engine/): stockfish-18-lite-single.js, stockfish-18-lite-single.wasm
+— unmodified, redistributed under GPLv3; full corresponding source is the
+public GitHub repository above.
 
 Sound effects: synthesized in-browser via the Web Audio API — no third-party
 audio clips used, no attribution required.

@@ -13,6 +13,9 @@ export type GameResult = {
 
 export type PendingPromotion = { from: Square; to: Square; color: Color };
 
+export type CpuLevelId = 'beginner' | 'club' | 'strong' | 'expert' | 'full';
+export type EngineStatus = 'idle' | 'loading' | 'ready' | 'thinking';
+
 interface GameState {
   chess: Chess;
   fen: string;
@@ -27,13 +30,25 @@ interface GameState {
   result: GameResult;
   announcement: string;
 
+  opponent: 'human' | 'cpu';
+  cpuColor: Color;
+  cpuLevel: CpuLevelId;
+  engineStatus: EngineStatus;
+  gameId: number;
+
   selectSquare: (square: Square) => void;
   clearSelection: () => void;
   tryMove: (from: Square, to: Square) => void;
   resolvePromotion: (piece: 'q' | 'r' | 'b' | 'n') => void;
   cancelPromotion: () => void;
   flipBoard: () => void;
+  setOrientation: (color: Color) => void;
   reset: () => void;
+  setOpponent: (mode: 'human' | 'cpu') => void;
+  setCpuColor: (color: Color) => void;
+  setCpuLevel: (level: CpuLevelId) => void;
+  setEngineStatus: (status: EngineStatus) => void;
+  playEngineMove: (from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n') => void;
 }
 
 function findKingSquare(chess: Chess, color: Color): Square | null {
@@ -110,6 +125,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   result: { over: false, reason: null, winner: null },
   announcement: '',
 
+  opponent: 'human',
+  cpuColor: 'b',
+  cpuLevel: 'club',
+  engineStatus: 'idle',
+  gameId: 0,
+
   selectSquare: (square) => {
     const { chess, result } = get();
     if (result.over) return;
@@ -172,10 +193,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   cancelPromotion: () => set({ pendingPromotion: null, selectedSquare: null, legalTargets: [] }),
 
   flipBoard: () => set((s) => ({ orientation: s.orientation === 'w' ? 'b' : 'w' })),
+  setOrientation: (color) => set({ orientation: color }),
 
   reset: () => {
     const chess = new Chess();
-    set({
+    set((s) => ({
       chess,
       fen: chess.fen(),
       board: chess.board(),
@@ -187,6 +209,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingPromotion: null,
       result: { over: false, reason: null, winner: null },
       announcement: 'New game. White to move.',
+      gameId: s.gameId + 1,
+    }));
+  },
+
+  setOpponent: (mode) => set({ opponent: mode }),
+  setCpuColor: (color) => set({ cpuColor: color }),
+  setCpuLevel: (level) => set({ cpuLevel: level }),
+  setEngineStatus: (status) => set({ engineStatus: status }),
+
+  playEngineMove: (from, to, promotion) => {
+    const { chess, result } = get();
+    if (result.over) return;
+    const { derived, announcement } = executeMove(chess, from, to, promotion);
+    set({
+      ...derived,
+      selectedSquare: null,
+      legalTargets: [],
+      pendingPromotion: null,
+      announcement,
     });
   },
 }));

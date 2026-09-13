@@ -27,6 +27,9 @@ export default function Board() {
   const tryMove = useGameStore((s) => s.tryMove);
   const resolvePromotion = useGameStore((s) => s.resolvePromotion);
   const cancelPromotion = useGameStore((s) => s.cancelPromotion);
+  const opponent = useGameStore((s) => s.opponent);
+  const cpuColor = useGameStore((s) => s.cpuColor);
+  const isCpuTurn = opponent === 'cpu' && turn === cpuColor;
 
   const boardMap = useMemo(() => {
     const m = new Map<Square, NonNullable<BoardSquare>>();
@@ -43,7 +46,7 @@ export default function Board() {
   const legalTargetSet = useMemo(() => new Set(legalTargets), [legalTargets]);
 
   function handlePointerDown(e: React.PointerEvent, square: Square) {
-    if (result.over || pendingPromotion) return;
+    if (result.over || pendingPromotion || isCpuTurn) return;
     const cell = boardMap.get(square);
     if (cell && cell.color === turn) {
       selectSquare(square);
@@ -103,7 +106,7 @@ export default function Board() {
       case 'Enter':
       case ' ':
         e.preventDefault();
-        if (result.over || pendingPromotion) return;
+        if (result.over || pendingPromotion || isCpuTurn) return;
         if (selectedSquare === square) {
           clearSelection();
         } else if (selectedSquare && legalTargetSet.has(square)) {
@@ -125,7 +128,7 @@ export default function Board() {
   return (
     <div className="board-wrap">
       <div
-        className="board"
+        className={`board${isCpuTurn ? ' board--locked' : ''}`}
         role="grid"
         aria-label="Chess board"
         onPointerMove={handlePointerMove}
