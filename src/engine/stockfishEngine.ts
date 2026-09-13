@@ -2,7 +2,8 @@ import type { Square } from 'chess.js';
 
 export type EngineMove = { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' };
 
-const ENGINE_URL = '/engine/stockfish-18-lite-single.js';
+export const ENGINE_SINGLE_THREADED_URL = '/engine/stockfish-18-lite-single.js';
+export const ENGINE_MULTI_THREADED_URL = '/engine/stockfish-18-lite-multi.js';
 
 function parseUciMove(uci: string): EngineMove {
   const from = uci.slice(0, 2) as Square;
@@ -16,8 +17,11 @@ export class StockfishEngine {
   private ready: Promise<void>;
   private bestMoveResolvers: Array<(move: EngineMove | null) => void> = [];
 
-  constructor() {
-    this.worker = new Worker(ENGINE_URL);
+  readonly engineUrl: string;
+
+  constructor(engineUrl: string = ENGINE_SINGLE_THREADED_URL) {
+    this.engineUrl = engineUrl;
+    this.worker = new Worker(engineUrl);
     this.ready = new Promise((resolve) => {
       const onMessage = (e: MessageEvent<string>) => {
         if (e.data === 'readyok') {

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { StockfishEngine } from '../engine/stockfishEngine';
-import { cpuLevelConfig } from '../engine/cpuLevels';
+import { cpuLevelConfig, engineUrlFor, threadsFor } from '../engine/cpuLevels';
 import { computeMaterial } from '../game/material';
 
 export default function CpuController() {
@@ -22,12 +22,16 @@ export default function CpuController() {
   const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (opponent !== 'cpu' || engineRef.current) return;
+    if (opponent !== 'cpu') return;
+    const desiredUrl = engineUrlFor(cpuLevelConfig(cpuLevel));
+    if (engineRef.current?.engineUrl === desiredUrl) return;
+
+    engineRef.current?.terminate();
     setEngineStatus('loading');
-    const engine = new StockfishEngine();
+    const engine = new StockfishEngine(desiredUrl);
     engineRef.current = engine;
     engine.whenReady().then(() => setEngineStatus('ready'));
-  }, [opponent, setEngineStatus]);
+  }, [opponent, cpuLevel, setEngineStatus]);
 
   useEffect(
     () => () => {
@@ -51,7 +55,7 @@ export default function CpuController() {
 
     setEngineStatus('thinking');
     engine
-      .configure(level.options)
+      .configure({ ...level.options, Threads: threadsFor(level) })
       .then(() => engine.findBestMove(fen, level.movetimeMs))
       .then((move) => {
         if (cancelled || requestId !== requestIdRef.current || !move) return;

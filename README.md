@@ -16,7 +16,10 @@ persistent-account product.
   is a visual approximation.
 - **Computer opponent** — [Stockfish 18](https://github.com/nmrugg/stockfish.js)
   compiled to WASM, running entirely in a Web Worker on your device. Five
-  strength presets from Beginner to Full strength.
+  strength presets from Beginner to Full strength. Full strength uses a
+  multi-threaded build (real parallel search, not just a bigger number) when
+  the page is cross-origin isolated, falling back to single-threaded
+  otherwise.
 - **Play a friend online** — create a room, share the link, and moves sync
   live over [Supabase](https://supabase.com) Realtime. Reload mid-game and
   you rejoin where you left off.
@@ -36,8 +39,9 @@ persistent-account product.
 
 - Vite + React + TypeScript
 - [chess.js](https://github.com/jhlywa/chess.js) for rules/legality
-- [Stockfish.js](https://github.com/nmrugg/stockfish.js) (WASM, lite
-  single-threaded build) for the CPU opponent
+- [Stockfish.js](https://github.com/nmrugg/stockfish.js) (WASM, lite build —
+  single-threaded normally, multi-threaded for Full strength) for the CPU
+  opponent
 - [Supabase](https://supabase.com) (Postgres + Realtime, free tier, no auth)
   for online multiplayer — a "room" is just a short random code, not an
   account
@@ -109,9 +113,16 @@ src/
 supabase/
   schema.sql    one-time table + RLS setup for online play
 public/
-  engine/       vendored Stockfish WASM build
+  engine/       vendored Stockfish WASM builds (single- and multi-threaded)
   assets/pieces/  cburnett piece set (see CREDITS.txt)
 ```
+
+`vercel.json` (and the dev/preview `server.headers` in `vite.config.ts`) set
+`Cross-Origin-Opener-Policy`/`Cross-Origin-Embedder-Policy` so the page is
+cross-origin isolated — required for `SharedArrayBuffer`, which the
+multi-threaded engine build needs. If you fork this and add other
+cross-origin resources, double-check they send a compatible
+`Cross-Origin-Resource-Policy` header (Google Fonts already does).
 
 ## Credits
 

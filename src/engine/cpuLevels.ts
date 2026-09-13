@@ -1,4 +1,5 @@
 import type { CpuLevelId } from '../store/gameStore';
+import { ENGINE_MULTI_THREADED_URL, ENGINE_SINGLE_THREADED_URL } from './stockfishEngine';
 
 export type CpuLevelConfig = {
   id: CpuLevelId;
@@ -6,6 +7,8 @@ export type CpuLevelConfig = {
   ratingLabel: string;
   movetimeMs: number;
   options: Record<string, string | number | boolean>;
+  /** Prefers the multi-threaded build when the page is cross-origin isolated. */
+  preferMultiThreaded?: boolean;
 };
 
 // Club/Strong/Expert use Stockfish's own UCI_Elo strength-limiting option
@@ -53,9 +56,27 @@ export const CPU_LEVELS: CpuLevelConfig[] = [
     ratingLabel: 'Uncapped',
     movetimeMs: 2000,
     options: { 'UCI_LimitStrength': false, 'Skill Level': 20 },
+    preferMultiThreaded: true,
   },
 ];
 
 export function cpuLevelConfig(id: CpuLevelId): CpuLevelConfig {
   return CPU_LEVELS.find((l) => l.id === id) ?? CPU_LEVELS[1];
+}
+
+/** True when the page is cross-origin isolated, so SharedArrayBuffer (and
+ * therefore the multi-threaded engine build) is actually usable. */
+export function canUseMultiThreadedEngine(): boolean {
+  return typeof self !== 'undefined' && self.crossOriginIsolated === true;
+}
+
+export function engineUrlFor(level: CpuLevelConfig): string {
+  if (level.preferMultiThreaded && canUseMultiThreadedEngine()) return ENGINE_MULTI_THREADED_URL;
+  return ENGINE_SINGLE_THREADED_URL;
+}
+
+export function threadsFor(level: CpuLevelConfig): number {
+  if (!(level.preferMultiThreaded && canUseMultiThreadedEngine())) return 1;
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 1 : 1;
+  return Math.max(1, Math.min(cores - 1, 4));
 }
