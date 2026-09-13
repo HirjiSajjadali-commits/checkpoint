@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { Color } from 'chess.js';
 import { pieceImages, pieceName } from '../game/pieceImages';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const CHOICES = ['q', 'r', 'b', 'n'] as const;
 
@@ -13,10 +14,9 @@ export default function PromotionPicker({
   onChoose: (piece: 'q' | 'r' | 'b' | 'n') => void;
   onCancel: () => void;
 }) {
-  const firstButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useFocusTrap<HTMLDivElement>(true);
 
   useEffect(() => {
-    firstButtonRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
     };
@@ -27,6 +27,7 @@ export default function PromotionPicker({
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div
+        ref={dialogRef}
         className="promotion-picker"
         role="dialog"
         aria-modal="true"
@@ -35,10 +36,9 @@ export default function PromotionPicker({
       >
         <p className="promotion-title">Promote to</p>
         <div className="promotion-choices">
-          {CHOICES.map((piece, i) => (
+          {CHOICES.map((piece) => (
             <button
               key={piece}
-              ref={i === 0 ? firstButtonRef : undefined}
               className="promotion-choice"
               aria-label={pieceName[piece]}
               onClick={() => onChoose(piece)}

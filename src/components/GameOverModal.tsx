@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore, type GameResultReason } from '../store/gameStore';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const REASON_TEXT: Record<NonNullable<GameResultReason>, string> = {
   checkmate: 'Checkmate',
@@ -15,8 +16,19 @@ export default function GameOverModal() {
   const gameId = useGameStore((s) => s.gameId);
   const reset = useGameStore((s) => s.reset);
   const [dismissedGameId, setDismissedGameId] = useState<number | null>(null);
+  const open = result.over && dismissedGameId !== gameId;
+  const dialogRef = useFocusTrap<HTMLDivElement>(open);
 
-  if (!result.over || dismissedGameId === gameId) return null;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDismissedGameId(gameId);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, gameId]);
+
+  if (!open) return null;
 
   const winnerName = result.winner === 'w' ? 'White' : result.winner === 'b' ? 'Black' : null;
   const headline = winnerName ? `${winnerName} wins` : 'Draw';
@@ -24,6 +36,7 @@ export default function GameOverModal() {
   return (
     <div className="modal-backdrop" onClick={() => setDismissedGameId(gameId)}>
       <div
+        ref={dialogRef}
         className="game-over-modal"
         role="dialog"
         aria-modal="true"
