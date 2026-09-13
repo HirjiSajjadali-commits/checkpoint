@@ -2,12 +2,23 @@ import { create } from 'zustand';
 import { Chess } from 'chess.js';
 import type { Color, PieceSymbol, Square } from 'chess.js';
 import { pieceName } from '../game/pieceImages';
+import { timeControlConfig, type TimeControlId } from '../game/timeControls';
+import { playCaptureSound, playCheckSound, playGameEndSound, playMoveSound } from '../audio/sounds';
 
 export type BoardSquare = { square: Square; type: PieceSymbol; color: Color } | null;
 
+export type GameResultReason =
+  | 'checkmate'
+  | 'stalemate'
+  | 'draw'
+  | 'draw-agreed'
+  | 'resignation'
+  | 'timeout'
+  | null;
+
 export type GameResult = {
   over: boolean;
-  reason: 'checkmate' | 'stalemate' | 'draw' | null;
+  reason: GameResultReason;
   winner: Color | null;
 };
 
@@ -29,12 +40,17 @@ interface GameState {
   pendingPromotion: PendingPromotion | null;
   result: GameResult;
   announcement: string;
+  moveHistory: string[];
 
   opponent: 'human' | 'cpu';
   cpuColor: Color;
   cpuLevel: CpuLevelId;
   engineStatus: EngineStatus;
   gameId: number;
+
+  timeControl: TimeControlId;
+  clockMs: { w: number; b: number } | null;
+  drawOffer: Color | null;
 
   selectSquare: (square: Square) => void;
   clearSelection: () => void;
@@ -49,6 +65,12 @@ interface GameState {
   setCpuLevel: (level: CpuLevelId) => void;
   setEngineStatus: (status: EngineStatus) => void;
   playEngineMove: (from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n') => void;
+  setTimeControl: (id: TimeControlId) => void;
+  tickClock: (color: Color, deltaMs: number) => void;
+  offerDraw: (by: Color) => void;
+  acceptDraw: () => void;
+  declineDraw: () => void;
+  resign: (by: Color) => void;
 }
 
 function findKingSquare(chess: Chess, color: Color): Square | null {
@@ -63,7 +85,7 @@ function findKingSquare(chess: Chess, color: Color): Square | null {
 function deriveStateFromChess(chess: Chess, lastMove: { from: Square; to: Square } | null) {
   const turn = chess.turn();
   const inCheck = chess.inCheck();
-  let reason: GameResult['reason'] = null;
+  let reason: GameResultReason = null;
   let winner: Color | null = null;
   if (chess.isCheckmate()) {
     reason = 'checkmate';
@@ -80,6 +102,7 @@ function deriveStateFromChess(chess: Chess, lastMove: { from: Square; to: Square
     lastMove,
     checkSquare: inCheck ? findKingSquare(chess, turn) : null,
     result: { over: reason !== null, reason, winner },
+    moveHistory: chess.history(),
   };
 }
 
@@ -98,17 +121,25 @@ function describeMove(chess: Chess, san: string, moverColor: Color, result: Game
   return text;
 }
 
-function executeMove(
-  chess: Chess,
-  from: Square,
-  to: Square,
-  promotion?: 'q' | 'r' | 'b' | 'n',
-) {
+function playSoundForMove(capture: boolean, result: GameResult, inCheck: boolean) {
+  if (result.over) playGameEndSound();
+  else if (inCheck) playCheckSound();
+  else if (capture) playCaptureSound();
+  else playMoveSound();
+}
+
+function executeMove(chess: Chess, from: Square, to: Square, promotion?: 'q' | 'r' | 'b' | 'n') {
   const moverColor = chess.turn();
   const move = chess.move({ from, to, promotion });
   const derived = deriveStateFromChess(chess, { from, to });
   const announcement = describeMove(chess, move.san, moverColor, derived.result);
+  playSoundForMove(move.captured !== undefined, derived.result, chess.inCheck());
   return { derived, announcement };
+}
+
+function initialClock(timeControl: TimeControlId): GameState['clockMs'] {
+  const initialMs = timeControlConfig(timeControl).initialMs;
+  return initialMs === null ? null : { w: initialMs, b: initialMs };
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -124,12 +155,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   pendingPromotion: null,
   result: { over: false, reason: null, winner: null },
   announcement: '',
+  moveHistory: [],
 
   opponent: 'human',
   cpuColor: 'b',
   cpuLevel: 'club',
   engineStatus: 'idle',
   gameId: 0,
+
+  timeControl: 'untimed',
+  clockMs: null,
+  drawOffer: null,
 
   selectSquare: (square) => {
     const { chess, result } = get();
@@ -169,6 +205,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       legalTargets: [],
       pendingPromotion: null,
       announcement,
+      drawOffer: null,
     });
   },
 
@@ -187,6 +224,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       legalTargets: [],
       pendingPromotion: null,
       announcement,
+      drawOffer: null,
     });
   },
 
@@ -209,7 +247,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       pendingPromotion: null,
       result: { over: false, reason: null, winner: null },
       announcement: 'New game. White to move.',
+      moveHistory: [],
       gameId: s.gameId + 1,
+      clockMs: initialClock(s.timeControl),
+      drawOffer: null,
     }));
   },
 
@@ -228,6 +269,56 @@ export const useGameStore = create<GameState>((set, get) => ({
       legalTargets: [],
       pendingPromotion: null,
       announcement,
+      drawOffer: null,
+    });
+  },
+
+  setTimeControl: (id) => {
+    set({ timeControl: id });
+    get().reset();
+  },
+
+  tickClock: (color, deltaMs) => {
+    const { clockMs, result } = get();
+    if (!clockMs || result.over) return;
+    const remaining = Math.max(0, clockMs[color] - deltaMs);
+    const newClockMs = { ...clockMs, [color]: remaining };
+    if (remaining <= 0) {
+      const winner = color === 'w' ? 'b' : 'w';
+      const colorName = color === 'w' ? 'White' : 'Black';
+      const winnerName = winner === 'w' ? 'White' : 'Black';
+      playGameEndSound();
+      set({
+        clockMs: newClockMs,
+        result: { over: true, reason: 'timeout', winner },
+        announcement: `${colorName} ran out of time. ${winnerName} wins.`,
+      });
+    } else {
+      set({ clockMs: newClockMs });
+    }
+  },
+
+  offerDraw: (by) => set({ drawOffer: by }),
+  declineDraw: () => set({ drawOffer: null }),
+
+  acceptDraw: () => {
+    playGameEndSound();
+    set({
+      drawOffer: null,
+      result: { over: true, reason: 'draw-agreed', winner: null },
+      announcement: 'Draw agreed.',
+    });
+  },
+
+  resign: (by) => {
+    const winner = by === 'w' ? 'b' : 'w';
+    const colorName = by === 'w' ? 'White' : 'Black';
+    const winnerName = winner === 'w' ? 'White' : 'Black';
+    playGameEndSound();
+    set({
+      drawOffer: null,
+      result: { over: true, reason: 'resignation', winner },
+      announcement: `${colorName} resigns. ${winnerName} wins.`,
     });
   },
 }));
